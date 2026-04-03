@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Push-Up Arena Perfect</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+
+  <style>
+    :root{
+      --bg:#07101e; --bg2:#0c1730; --text:#f5f9ff; --muted:#a7b6dd; --line:rgba(255,255,255,.08);
+      --cyan:#6ff0ff; --blue:#79a7ff; --violet:#9d75ff; --green:#2ce8a1; --orange:#ff9d5a; --yellow:#ffd166; --red:#ff677f;
+      --shadow:0 0 28px rgba(111,240,255,.14), 0 0 90px rgba(157,117,255,.08);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Inter,Arial,sans-serif; color:var(--text);
+      background:
+        radial-gradient(circle at 12% 10%, rgba(111,240,255,.11), transparent 22%),
+        radial-gradient(circle at 88% 10%, rgba(157,117,255,.14), transparent 26%),
+        linear-gradient(180deg,var(--bg),var(--bg2));
+      overflow-x:hidden;
+    }
+    body::before{
+      content:""; position:fixed; inset:0; pointer-events:none;
+      background:
+        linear-gradient(rgba(255,255,255,.016) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.016) 1px, transparent 1px);
+      background-size:36px 36px; opacity:.28; mask-image:linear-gradient(180deg, rgba(0,0,0,.85), transparent 92%);
+    }
+    .app{width:min(1500px,100%); margin:0 auto; padding:18px}
+    .topbar{display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px}
+    .brand{display:flex; align-items:center; gap:14px}
+    .logo{
+      width:62px; height:62px; border-radius:20px; border:1px solid rgba(255,255,255,.10);
+      background:radial-gradient(circle at 35% 35%, rgba(111,240,255,.36), transparent 28%), linear-gradient(135deg, rgba(111,240,255,.18), rgba(157,117,255,.20));
+      box-shadow:var(--shadow); position:relative; overflow:hidden;
+    }
+    .logo::after{content:""; position:absolute; inset:15px; border-radius:14px; border:2px solid rgba(255,255,255,.72)}
+    h1{margin:0; font-size:34px}
+    .subtitle{margin-top:4px; color:var(--muted); font-size:13px}
+    .top-actions{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    select,button,input{
+      font:inherit; border:none; outline:none;
+      border-radius:16px; padding:12px 14px; color:var(--text);
+    }
+    select,input{background:rgba(20,31,62,.84); border:1px solid rgba(255,255,255,.08)}
+    button{
+      cursor:pointer; font-weight:800;
+      background:linear-gradient(135deg, rgba(111,240,255,.95), rgba(121,167,255,.95) 42%, rgba(157,117,255,.95));
+      box-shadow:0 10px 24px rgba(111,240,255,.18);
+    }
+    button.secondary{background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.03)); box-shadow:none; border:1px solid rgba(255,255,255,.08)}
+    .chip{padding:10px 14px; border-radius:999px; background:rgba(255,255,255,.04); border:1px solid var(--line); font-size:13px}
+    .hero{
+      margin-bottom:16px; padding:24px; border-radius:30px; border:1px solid var(--line);
+      background:radial-gradient(circle at 12% 18%, rgba(111,240,255,.15), transparent 26%), radial-gradient(circle at 90% 18%, rgba(157,117,255,.15), transparent 28%), linear-gradient(135deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      box-shadow:var(--shadow);
+    }
+    .hero h2{margin:0 0 10px; font-size:32px; line-height:1.06}
+    .hero p{margin:0; color:var(--muted); font-size:15px; line-height:1.6}
+    .tips{display:flex; gap:10px; flex-wrap:wrap; margin-top:16px}
+    .tip{padding:10px 14px; border-radius:999px; font-size:13px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08)}
+    .layout{display:grid; grid-template-columns:1.45fr .95fr; gap:16px}
+    .panel{
+      border:1px solid var(--line); border-radius:30px; overflow:hidden;
+      background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.02));
+      box-shadow:var(--shadow); position:relative; backdrop-filter:blur(14px);
+    }
+    .panel::before{
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background:linear-gradient(125deg, rgba(255,255,255,.06), transparent 18%, transparent 82%, rgba(255,255,255,.03)); opacity:.35;
+    }
+    .viewer,.side{padding:16px}
+    .stage{
+      position:relative; min-height:620px; border-radius:24px; overflow:hidden;
+      border:1px solid rgba(255,255,255,.08);
+      background:radial-gradient(circle at center, rgba(111,240,255,.05), transparent 35%), linear-gradient(180deg,#02050d,#000000);
+    }
+    .stage::after{
+      content:""; position:absolute; left:0; right:0; bottom:0; height:28%;
+      background:linear-gradient(180deg, transparent, rgba(10,24,50,.78)), radial-gradient(circle at center, rgba(111,240,255,.14), transparent 58%);
+      pointer-events:none;
+    }
+    .floor{position:absolute; left:6%; right:6%; bottom:7.5%; height:11.5%; border-radius:999px; border:1px solid rgba(255,255,255,.10); background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)); pointer-events:none}
+    .floor::before{content:""; position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); height:2px; background:repeating-linear-gradient(90deg, rgba(255,255,255,.1) 0 26px, transparent 26px 50px)}
+    video{width:100%; display:block; background:#000; transform:scaleX(-1)}
+    canvas{position:absolute; inset:0; width:100%; height:100%; transform:scaleX(-1); pointer-events:none}
+    .overlay{position:absolute; left:18px; right:18px; top:18px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; pointer-events:none}
+    .oc{
+      padding:10px 14px; border-radius:16px;
+      background:rgba(4,10,20,.60);
+      border:1px solid rgba(255,255,255,.10);
+      font-size:13px;
+      backdrop-filter:blur(10px);
+    }
+    .pulse{
+      width:9px; height:9px; display:inline-block; border-radius:999px;
+      background:var(--green); box-shadow:0 0 10px var(--green); margin-right:8px;
+      animation:pulse 1.45s infinite; vertical-align:middle;
+    }
+    @keyframes pulse{0%{transform:scale(.95)}50%{transform:scale(1.2)}100%{transform:scale(.95)}}
+    .sectiontitle{display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; color:var(--muted); letter-spacing:.18em; margin-bottom:12px}
+    .controls{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px}
+    .controls.three{grid-template-columns:1fr 1fr 1fr}
+    .counter-wrap,.block,.status,.coach,.help,.scores{
+      padding:16px; border-radius:22px; border:1px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.02));
+      margin-bottom:12px;
+    }
+    .counterlabel{font-size:12px; color:#dff3ff; text-transform:uppercase; letter-spacing:.22em}
+    .counter{font-size:116px; line-height:1; font-weight:900; margin:6px 0; text-shadow:0 0 22px rgba(111,240,255,.36)}
+    .counter-sub{display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:14px}
+    .progress{margin-top:12px; height:16px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.06)}
+    .progress>div{height:100%; width:0%; background:linear-gradient(90deg, var(--green), var(--cyan), var(--violet)); transition:width .18s ease}
+    .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+    .metric{padding:14px 16px; border-radius:20px; border:1px solid rgba(255,255,255,.08); background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.02))}
+    .metric .k{font-size:12px; color:var(--muted); letter-spacing:.1em; text-transform:uppercase}
+    .metric .v{font-size:22px; font-weight:850; margin-top:8px}
+    .status strong,.coach strong,.help strong,.scores strong{color:var(--cyan)}
+    .scores ul{margin:10px 0 0; padding-left:18px}
+    .scores li{margin:6px 0; color:var(--muted)}
+    .footer{margin-top:12px; color:var(--muted); font-size:12px; text-align:center}
+    @media (max-width:1150px){ .layout{grid-template-columns:1fr} .counter{font-size:84px} .stage{min-height:380px} }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1 id="appTitle">Push-Up Arena</h1>
+          <div class="subtitle" id="appSubtitle">Mode libre + défi du jour, avec niveaux de pompes, paliers et streak.</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <select id="languageSelect">
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+          <option value="es">Español</option>
+        </select>
+        <select id="levelSelect">
+          <option value="knees">Pompes genoux</option>
+          <option value="beginner">Débutant</option>
+          <option value="pro">Pro</option>
+          <option value="elite">Elite</option>
+        </select>
+        <div class="chip" id="modelBadge">Modèle : chargement...</div>
+        <div class="chip" id="fpsBadge">FPS : --</div>
+        <div class="chip" id="cameraBadge">Caméra : inactive</div>
+      </div>
+    </div>
+
+    <div class="hero">
+      <h2 id="heroTitle">Un site plus propre, plus clair, et plus exigeant selon ton niveau.</h2>
+      <p id="heroText">
+        Le défi 1 minute a été retiré. Les autres défis sont conservés. J’ai aussi ajouté un niveau de difficulté pour le comptage des pompes :
+        plus le niveau monte, plus il faut descendre bas pour qu’une pompe soit validée.
+      </p>
+      <div class="tips">
+        <div class="tip" id="tip1">1. Choisis une langue</div>
+        <div class="tip" id="tip2">2. Choisis ton niveau</div>
+        <div class="tip" id="tip3">3. Démarre la caméra</div>
+        <div class="tip" id="tip4">4. Joue en libre ou fais le défi du jour</div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="panel viewer">
+        <div class="stage">
+          <video id="video" autoplay playsinline muted></video>
+          <canvas id="canvas"></canvas>
+          <div class="floor"></div>
+
+          <div class="overlay">
+            <div class="oc"><span class="pulse"></span><span id="liveLabel">POMPES EN DIRECT</span></div>
+            <div class="oc" id="challengeChip">Défi : Libre</div>
+            <div class="oc" id="phaseChip">Phase : prêt</div>
+            <div class="oc" id="metricChip">Angle : --</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel side">
+        <div class="sectiontitle">
+          <div id="controlTitle">COMMANDES</div>
+          <div id="controlSubtitle">NIVEAUX + DEFIS</div>
+        </div>
+
+        <div class="controls">
+          <button id="startBtn">Démarrer la caméra</button>
+          <button id="sessionBtn" class="secondary">Lancer la session</button>
+        </div>
+
+        <div class="controls three">
+          <button id="switchBtn" class="secondary">Changer caméra</button>
+          <button id="resetBtn" class="secondary">Remettre à zéro</button>
+          <button id="startChallengeBtn" class="secondary">Lancer le défi</button>
+        </div>
+
+        <div class="block">
+          <div class="counterlabel" id="challengeLabel">Choisir un défi</div>
+          <div class="controls">
+            <select id="challengeSelect">
+              <option value="free">Mode libre</option>
+              <option value="daily">Défi du jour</option>
+            </select>
+            <input id="dailyTargetInput" type="number" min="1" step="1" value="50" />
+          </div>
+        </div>
+
+        <div class="counter-wrap">
+          <div class="counterlabel" id="counterLabel">Pompes validées</div>
+          <div class="counter" id="repCount">0</div>
+          <div class="counter-sub">
+            <span id="milestoneText">Prochain palier : 10</span>
+            <span id="timerText">00:00</span>
+          </div>
+          <div class="progress"><div id="progressFill"></div></div>
+        </div>
+
+        <div class="grid2">
+          <div class="metric"><div class="k" id="m1k">Niveau</div><div class="v" id="levelLabel">Début</div></div>
+          <div class="metric"><div class="k" id="m2k">Série</div><div class="v" id="streakLabel">0</div></div>
+          <div class="metric"><div class="k" id="m3k">Session</div><div class="v" id="sessionLabel">00:00</div></div>
+          <div class="metric"><div class="k" id="m4k">Défi</div><div class="v" id="challengeStatusLabel">Libre</div></div>
+          <div class="metric"><div class="k" id="m5k">Total</div><div class="v" id="totalPushupsLabel">0</div></div>
+          <div class="metric"><div class="k" id="m6k">Niveau pompe</div><div class="v" id="pushupModeLabel">Genoux</div></div>
+        </div>
+
+        <div class="status" id="statusBox"><strong>Status :</strong> en attente de démarrage.</div>
+        <div class="coach" id="coachBox"><strong>Coach :</strong> mets-toi de profil pour un meilleur comptage.</div>
+
+        <div class="scores">
+          <strong id="scoreTitle">Meilleurs scores</strong>
+          <ul id="bestScoresList"></ul>
+        </div>
+
+        <div class="help"><strong id="helpTitle">Aide :</strong> <span id="helpText">Le niveau choisi change l’angle minimum à atteindre. Le défi du jour augmente le streak si tu le réussis, et le streak retombe à 0 si tu rates un jour.</span></div>
+      </div>
+    </div>
+
+    <div class="footer" id="footerText">Lance via localhost : python -m http.server 8000</div>
+  </div>
+
+  <script>
+    const I18N = {
+      fr: {
+        appTitle:"Push-Up Arena",
+        appSubtitle:"Mode libre + défi du jour, avec niveaux de pompes, paliers et streak.",
+        heroTitle:"Un site plus propre, plus clair, et plus exigeant selon ton niveau.",
+        heroText:"Le défi 1 minute et les anciens défis ont été retirés. Il reste seulement le mode libre et le défi du jour avec streak. Plus le niveau monte, plus il faut descendre bas pour qu’une pompe soit validée.",
+        tip1:"1. Choisis une langue", tip2:"2. Choisis ton niveau", tip3:"3. Démarre la caméra", tip4:"4. Joue en libre ou fais le défi du jour",
+        liveLabel:"POMPES EN DIRECT",
+        controlTitle:"COMMANDES", controlSubtitle:"NIVEAUX + DEFIS",
+        startCamera:"Démarrer la caméra", startSession:"Lancer la session", stopSession:"Mettre en pause",
+        switchCamera:"Changer caméra", reset:"Remettre à zéro", launchChallenge:"Lancer le défi",
+        challengeLabel:"Choisir un défi", counterLabel:"Pompes validées",
+        m1k:"Niveau", m2k:"Série", m3k:"Session", m4k:"Défi",
+        helpTitle:"Aide :", helpText:"Le niveau choisi change l’angle minimum à atteindre. Le défi du jour augmente le streak si tu le réussis, et le streak retombe à 0 si tu rates un jour.",
+        scoreTitle:"Meilleurs scores",
+        footerText:"Lance via localhost : python -m http.server 8000",
+        statusPrefix:"Status", coachPrefix:"Coach",
+        challenges:{ free:"Mode libre", daily:"Défi du jour" },
+        levelsLabel:{ knees:"Pompes genoux", beginner:"Débutant", pro:"Pro", elite:"Elite" },
+        labels:{ challenge:"Défi", phase:"Phase", ready:"prêt", angle:"Angle", milestone:"Prochain palier", goal100:"Objectif 100", daily:"Défi du jour" },
+        uiLevels:["Début","Bronze","Intermédiaire","Avancé","Master","Elite"],
+        statuses:{
+          waiting:"en attente de démarrage.", cameraReady:"caméra active. Le comptage est prêt.", cameraChanged:"caméra changée.", reset:"compteur réinitialisé.",
+          noBody:"aucun corps détecté.", arms:"bras mal détectés.", bottom:"bas validé.", rep:"pompe validée", milestone:"palier atteint",
+          errorStart:"impossible de démarrer : ", challengeHint:"clique sur « Lancer le défi » pour démarrer.",
+          free:"mode libre actif.", goal100:"défi 100 pompes lancé.", hiit:"HIIT lancé : 20 sec travail / 10 sec repos.", ladder:"ladder lancé.",
+          nopause:"défi sans pause lancé.", daily:"défi du jour lancé.", challengeDone:"défi terminé"
+        },
+        coach:{
+          profile:"mets-toi de profil pour un meilleur comptage.", descend:"position haute reconnue. Descends.", up:"remonte complètement.",
+          free:"fais des pompes librement.", goal100:"objectif : atteindre 100.", hiit:"20 secondes travail, puis 10 secondes repos.",
+          ladder:"fais 1, puis 2, puis 3...", nopause:"ne t’arrête pas plus de 2 secondes.", daily:"complète ton objectif du jour.",
+          milestone:"excellent, tu viens d’atteindre un nouveau palier."
+        },
+        scoreNames:{ free:"Mode libre", daily:"Défi du jour" }
+      },
+      en: {
+        appTitle:"Push-Up Arena",
+        appSubtitle:"All challenges except 1 minute, with push-up levels and best scores.",
+        heroTitle:"A cleaner, clearer site with stricter counting depending on your level.",
+        heroText:"The 1-minute challenge was removed. The other challenges remain. A push-up level selector was added: the higher the level, the deeper you must go for a rep to count.",
+        tip1:"1. Choose a language", tip2:"2. Choose your level", tip3:"3. Start the camera", tip4:"4. Launch a challenge",
+        liveLabel:"LIVE PUSH-UPS",
+        controlTitle:"CONTROLS", controlSubtitle:"LEVELS + CHALLENGES",
+        startCamera:"Start camera", startSession:"Start session", stopSession:"Pause session",
+        switchCamera:"Switch camera", reset:"Reset", launchChallenge:"Start challenge",
+        challengeLabel:"Choose a challenge", counterLabel:"Valid push-ups",
+        m1k:"Level", m2k:"Streak", m3k:"Session", m4k:"Challenge",
+        helpTitle:"Help:", helpText:"The selected level changes the minimum angle required for a push-up to count.",
+        scoreTitle:"Best scores",
+        footerText:"Run with localhost: python -m http.server 8000",
+        statusPrefix:"Status", coachPrefix:"Coach",
+        challenges:{ free:"Free mode", daily:"Daily challenge" },
+        levelsLabel:{ knees:"Knee push-ups", beginner:"Beginner", pro:"Pro", elite:"Elite" },
+        labels:{ challenge:"Challenge", phase:"Phase", ready:"ready", angle:"Angle", milestone:"Next milestone", goal100:"Goal 100", daily:"Daily challenge" },
+        uiLevels:["Beginner","Bronze","Intermediate","Advanced","Master","Elite"],
+        statuses:{
+          waiting:"waiting to start.", cameraReady:"camera active. Counting is ready.", cameraChanged:"camera changed.", reset:"counter reset.",
+          noBody:"no body detected.", arms:"arms not detected correctly.", bottom:"bottom position validated.", rep:"push-up validated", milestone:"milestone reached",
+          errorStart:"unable to start: ", challengeHint:"click “Start challenge” to begin.",
+          free:"free mode active.", goal100:"100 push-ups challenge started.", hiit:"HIIT started: 20 sec work / 10 sec rest.", ladder:"ladder started.",
+          nopause:"no-pause challenge started.", daily:"daily challenge started.", challengeDone:"challenge finished"
+        },
+        coach:{
+          profile:"stay sideways for better counting.", descend:"top position detected. Go down.", up:"come all the way back up.",
+          free:"do your push-ups freely.", goal100:"goal: reach 100.", hiit:"20 seconds work, then 10 seconds rest.",
+          ladder:"do 1, then 2, then 3...", nopause:"do not stop longer than 2 seconds.", daily:"complete your daily target.",
+          milestone:"great, you reached a new milestone."
+        },
+        scoreNames:{ free:"Free mode", daily:"Daily challenge" }
+      },
+      es: {
+        appTitle:"Push-Up Arena",
+        appSubtitle:"Todos los desafíos excepto 1 minuto, con niveles de flexiones y mejores puntuaciones.",
+        heroTitle:"Un sitio más claro y más exigente según tu nivel.",
+        heroText:"El desafío de 1 minuto fue eliminado. Los otros desafíos siguen disponibles. También se añadió un selector de nivel: cuanto más alto sea el nivel, más abajo debes bajar para que cuente la flexión.",
+        tip1:"1. Elige un idioma", tip2:"2. Elige tu nivel", tip3:"3. Inicia la cámara", tip4:"4. Inicia un desafío",
+        liveLabel:"FLEXIONES EN DIRECTO",
+        controlTitle:"CONTROLES", controlSubtitle:"NIVELES + DESAFÍOS",
+        startCamera:"Iniciar cámara", startSession:"Iniciar sesión", stopSession:"Pausar sesión",
+        switchCamera:"Cambiar cámara", reset:"Reiniciar", launchChallenge:"Iniciar desafío",
+        challengeLabel:"Elegir un desafío", counterLabel:"Flexiones válidas",
+        m1k:"Nivel", m2k:"Racha", m3k:"Sesión", m4k:"Desafío",
+        helpTitle:"Ayuda:", helpText:"El nivel elegido cambia el ángulo mínimo necesario para que una flexión cuente.",
+        scoreTitle:"Mejores puntuaciones",
+        footerText:"Ejecuta con localhost: python -m http.server 8000",
+        statusPrefix:"Estado", coachPrefix:"Coach",
+        challenges:{ free:"Modo libre", daily:"Desafío diario" },
+        levelsLabel:{ knees:"Flexiones de rodillas", beginner:"Principiante", pro:"Pro", elite:"Elite" },
+        labels:{ challenge:"Desafío", phase:"Fase", ready:"listo", angle:"Ángulo", milestone:"Próximo nivel", goal100:"Meta 100", daily:"Desafío diario" },
+        uiLevels:["Inicio","Bronce","Intermedio","Avanzado","Master","Elite"],
+        statuses:{
+          waiting:"esperando para empezar.", cameraReady:"cámara activa. El conteo está listo.", cameraChanged:"cámara cambiada.", reset:"contador reiniciado.",
+          noBody:"no se detecta ningún cuerpo.", arms:"brazos mal detectados.", bottom:"posición baja validada.", rep:"flexión validada", milestone:"nivel alcanzado",
+          errorStart:"no se pudo iniciar: ", challengeHint:"haz clic en “Iniciar desafío” para empezar.",
+          free:"modo libre activo.", goal100:"desafío de 100 flexiones iniciado.", hiit:"HIIT iniciado: 20 s trabajo / 10 s descanso.", ladder:"escalera iniciada.",
+          nopause:"desafío sin pausa iniciado.", daily:"desafío diario iniciado.", challengeDone:"desafío terminado"
+        },
+        coach:{
+          profile:"ponte de perfil para un mejor conteo.", descend:"posición alta detectada. Baja.", up:"sube completamente.",
+          free:"haz tus flexiones libremente.", goal100:"objetivo: llegar a 100.", hiit:"20 segundos trabajo, luego 10 segundos descanso.",
+          ladder:"haz 1, luego 2, luego 3...", nopause:"no pares más de 2 segundos.", daily:"completa tu objetivo diario.",
+          milestone:"excelente, alcanzaste un nuevo nivel."
+        },
+        scoreNames:{ free:"Modo libre", daily:"Desafío diario" }
+      }
+    };
+
+    const LEVEL_CONFIG = {
+      knees:    { down: 125, up: 155, ready: 165 },
+      beginner: { down: 110, up: 155, ready: 165 },
+      pro:      { down: 95,  up: 155, ready: 165 },
+      elite:    { down: 85,  up: 155, ready: 165 }
+    };
+
+    const SCORE_KEYS = {
+      free: "pushup_best_free",
+      daily: "pushup_best_daily"
+    };
+
+    const DAILY_STREAK_KEY = "pushup_daily_streak";
+    const DAILY_STREAK_DATE_KEY = "pushup_daily_streak_date";
+    const TOTAL_PUSHUPS_KEY = "pushup_total_lifetime";
+
+    let lang = "fr";
+
+    const languageSelect = document.getElementById("languageSelect");
+    const levelSelect = document.getElementById("levelSelect");
+    const challengeSelect = document.getElementById("challengeSelect");
+    const dailyTargetInput = document.getElementById("dailyTargetInput");
+
+    const appTitle = document.getElementById("appTitle");
+    const appSubtitle = document.getElementById("appSubtitle");
+    const heroTitle = document.getElementById("heroTitle");
+    const heroText = document.getElementById("heroText");
+    const tip1 = document.getElementById("tip1");
+    const tip2 = document.getElementById("tip2");
+    const tip3 = document.getElementById("tip3");
+    const tip4 = document.getElementById("tip4");
+    const liveLabel = document.getElementById("liveLabel");
+    const controlTitle = document.getElementById("controlTitle");
+    const controlSubtitle = document.getElementById("controlSubtitle");
+    const challengeLabel = document.getElementById("challengeLabel");
+    const counterLabel = document.getElementById("counterLabel");
+    const m1k = document.getElementById("m1k");
+    const m2k = document.getElementById("m2k");
+    const m3k = document.getElementById("m3k");
+    const m4k = document.getElementById("m4k");
+    const helpTitle = document.getElementById("helpTitle");
+    const helpText = document.getElementById("helpText");
+    const scoreTitle = document.getElementById("scoreTitle");
+    const footerText = document.getElementById("footerText");
+
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const startBtn = document.getElementById("startBtn");
+    const switchBtn = document.getElementById("switchBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const sessionBtn = document.getElementById("sessionBtn");
+    const startChallengeBtn = document.getElementById("startChallengeBtn");
+
+    const repCountEl = document.getElementById("repCount");
+    const statusBox = document.getElementById("statusBox");
+    const coachBox = document.getElementById("coachBox");
+    const modelBadge = document.getElementById("modelBadge");
+    const fpsBadge = document.getElementById("fpsBadge");
+    const cameraBadge = document.getElementById("cameraBadge");
+    const levelLabel = document.getElementById("levelLabel");
+    const streakLabel = document.getElementById("streakLabel");
+    const sessionLabel = document.getElementById("sessionLabel");
+    const milestoneText = document.getElementById("milestoneText");
+    const progressFill = document.getElementById("progressFill");
+    const phaseChip = document.getElementById("phaseChip");
+    const metricChip = document.getElementById("metricChip");
+    const timerText = document.getElementById("timerText");
+    const challengeChip = document.getElementById("challengeChip");
+    const challengeStatusLabel = document.getElementById("challengeStatusLabel");
+    const bestScoresList = document.getElementById("bestScoresList");
+    const totalPushupsLabel = document.getElementById("totalPushupsLabel");
+    const pushupModeLabel = document.getElementById("pushupModeLabel");
+    const m5k = document.getElementById("m5k");
+    const m6k = document.getElementById("m6k");
+
+    let detector = null, stream = null, facingMode = "user", running = false;
+    let repCount = 0, streak = 0, frames = 0, lastFpsTime = performance.now();
+    let sessionRunning = false, sessionStartTs = null, sessionInterval = null;
+
+    let repState = "ready";
+    let smoothedMetric = null;
+    let confirmFrames = 0;
+    let cooldownFrames = 0;
+    let lastRepTs = 0;
+    let lastRepGapTs = null;
+
+    let challengeMode = "free";
+    let challengeRunning = false;
+    let challengeFinished = false;
+    let challengeStartTs = null;
+    let challengeRoundState = "work";
+    let challengeRoundUntil = null;
+    let ladderGoal = 1;
+    let noPauseFail = false;
+
+    function t(path){
+      const parts = path.split(".");
+      let cur = I18N[lang];
+      for (const p of parts) cur = cur[p];
+      return cur;
+    }
+
+    function setStatus(text){ statusBox.innerHTML = `<strong>${t("statusPrefix")} :</strong> ${text}`; }
+    function setCoach(text){ coachBox.innerHTML = `<strong>${t("coachPrefix")} :</strong> ${text}`; }
+    function formatTime(ms){
+      const t=Math.max(0, Math.floor(ms/1000));
+      return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0");
+    }
+    function mean(arr){ const v=arr.filter(x=>x!=null && Number.isFinite(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; }
+    function ema(prev, cur, a=.28){ if(cur==null) return prev; if(prev==null) return cur; return prev*(1-a)+cur*a; }
+    function angle(a,b,c){
+      if(!a||!b||!c) return null;
+      const abx=a.x-b.x, aby=a.y-b.y, cbx=c.x-b.x, cby=c.y-b.y;
+      const dot=abx*cbx+aby*cby, m1=Math.hypot(abx,aby), m2=Math.hypot(cbx,cby);
+      if(!m1||!m2) return null;
+      let cos=dot/(m1*m2); cos=Math.max(-1,Math.min(1,cos));
+      return Math.acos(cos)*180/Math.PI;
+    }
+    function getKP(pose,name){ return pose.keypoints.find(k=>k.name===name || k.part===name); }
+
+    function getBestScore(mode){
+      return parseInt(localStorage.getItem(SCORE_KEYS[mode] || "") || "0", 10);
+    }
+
+    function getLifetimeTotal(){
+      return parseInt(localStorage.getItem(TOTAL_PUSHUPS_KEY) || "0", 10);
+    }
+
+    function addLifetimePushup(){
+      const total = getLifetimeTotal() + 1;
+      localStorage.setItem(TOTAL_PUSHUPS_KEY, String(total));
+      return total;
+    }
+
+    function saveBestScore(mode, score){
+      const current = getBestScore(mode);
+      if (score > current) localStorage.setItem(SCORE_KEYS[mode], String(score));
+    }
+
+    function daysBetween(dateA, dateB){
+      const a = new Date(dateA + "T00:00:00");
+      const b = new Date(dateB + "T00:00:00");
+      return Math.round((b - a) / 86400000);
+    }
+
+    function todayKey(){
+      return new Date().toISOString().slice(0,10);
+    }
+
+    function getDailyStreak(){
+      return parseInt(localStorage.getItem(DAILY_STREAK_KEY) || "0", 10);
+    }
+
+    function getDailyStreakDate(){
+      return localStorage.getItem(DAILY_STREAK_DATE_KEY) || "";
+    }
+
+    function normalizeDailyStreak(){
+      const last = getDailyStreakDate();
+      if (!last) return;
+      const diff = daysBetween(last, todayKey());
+      if (diff > 1) {
+        localStorage.setItem(DAILY_STREAK_KEY, "0");
+      }
+    }
+
+    function completeDailyStreakIfNeeded(){
+      const today = todayKey();
+      const last = getDailyStreakDate();
+      let streak = getDailyStreak();
+      if (last === today) return streak;
+      if (!last) streak = 1;
+      else {
+        const diff = daysBetween(last, today);
+        if (diff === 1) streak += 1;
+        else streak = 1;
+      }
+      localStorage.setItem(DAILY_STREAK_KEY, String(streak));
+      localStorage.setItem(DAILY_STREAK_DATE_KEY, today);
+      return streak;
+    }
+
+    function dailyStreakText(){
+      const streak = getDailyStreak();
+      return streak > 0 ? `🏋️ ${streak}` : `🏋️ 0`;
+    }
+
+    function renderBestScores(){
+      normalizeDailyStreak();
+      bestScoresList.innerHTML = "";
+      const streakLi = document.createElement("li");
+      streakLi.textContent = `Streak ${t("challenges.daily")} : ${dailyStreakText()}`;
+      bestScoresList.appendChild(streakLi);
+      Object.keys(SCORE_KEYS).forEach(mode => {
+        const li = document.createElement("li");
+        li.textContent = `${t("scoreNames."+mode)} : ${getBestScore(mode)}`;
+        bestScoresList.appendChild(li);
+      });
+    }
+
+    function applyLanguage(){
+      document.documentElement.lang = lang;
+      appTitle.textContent = t("appTitle");
+      appSubtitle.textContent = t("appSubtitle");
+      heroTitle.textContent = t("heroTitle");
+      heroText.textContent = t("heroText");
+      tip1.textContent = t("tip1");
+      tip2.textContent = t("tip2");
+      tip3.textContent = t("tip3");
+      tip4.textContent = t("tip4");
+      liveLabel.textContent = t("liveLabel");
+      controlTitle.textContent = t("controlTitle");
+      controlSubtitle.textContent = t("controlSubtitle");
+      startBtn.textContent = t("startCamera");
+      sessionBtn.textContent = sessionRunning ? t("stopSession") : t("startSession");
+      switchBtn.textContent = t("switchCamera");
+      resetBtn.textContent = t("reset");
+      startChallengeBtn.textContent = t("launchChallenge");
+      challengeLabel.textContent = t("challengeLabel");
+      counterLabel.textContent = t("counterLabel");
+      m1k.textContent = t("m1k");
+      m2k.textContent = t("m2k");
+      m3k.textContent = t("m3k");
+      m4k.textContent = t("m4k");
+      if (m5k) m5k.textContent = lang === "fr" ? "Total" : (lang === "en" ? "Total" : "Total");
+      if (m6k) m6k.textContent = lang === "fr" ? "Niveau pompe" : (lang === "en" ? "Push-up level" : "Nivel flexión");
+      helpTitle.textContent = t("helpTitle");
+      helpText.textContent = t("helpText");
+      scoreTitle.textContent = t("scoreTitle");
+      footerText.textContent = t("footerText");
+
+      challengeSelect.innerHTML = `
+        <option value="free">${t("challenges.free")}</option>
+        <option value="daily">${t("challenges.daily")}</option>
+      `;
+      challengeSelect.value = challengeMode;
+
+      levelSelect.innerHTML = `
+        <option value="knees">${t("levelsLabel.knees")}</option>
+        <option value="beginner">${t("levelsLabel.beginner")}</option>
+        <option value="pro">${t("levelsLabel.pro")}</option>
+        <option value="elite">${t("levelsLabel.elite")}</option>
+      `;
+
+      renderBestScores();
+      updateUI();
+    }
+
+    function updateChallengeLabels(){
+      challengeChip.textContent = `${t("labels.challenge")} : ${t("challenges."+challengeMode)}`;
+      challengeStatusLabel.textContent = t("challenges."+challengeMode);
+    }
+
+    function updateUI(){
+      repCountEl.textContent = repCount;
+      streakLabel.textContent = streak;
+      updateChallengeLabels();
+      if (totalPushupsLabel) totalPushupsLabel.textContent = String(getLifetimeTotal());
+      if (pushupModeLabel) pushupModeLabel.textContent = levelSelect.options[levelSelect.selectedIndex]?.text || "";
+
+      let uiLevel = lang === "fr" ? "Initiation" : (lang === "en" ? "Rookie" : "Inicio");
+      if(repCount >= 150) uiLevel = lang === "fr" ? "Légende" : (lang === "en" ? "Legend" : "Leyenda");
+      else if(repCount >= 100) uiLevel = lang === "fr" ? "Diamant" : (lang === "en" ? "Diamond" : "Diamante");
+      else if(repCount >= 75) uiLevel = lang === "fr" ? "Platine" : (lang === "en" ? "Platinum" : "Platino");
+      else if(repCount >= 50) uiLevel = lang === "fr" ? "Or" : (lang === "en" ? "Gold" : "Oro");
+      else if(repCount >= 30) uiLevel = lang === "fr" ? "Argent" : (lang === "en" ? "Silver" : "Plata");
+      else if(repCount >= 10) uiLevel = lang === "fr" ? "Bronze" : (lang === "en" ? "Bronze" : "Bronce");
+      levelLabel.textContent = uiLevel;
+
+      if (challengeMode === "daily") {
+        const target = Math.max(1, parseInt(dailyTargetInput.value || "1", 10));
+        milestoneText.textContent = `${t("labels.daily")} : ${repCount} / ${target}`;
+        progressFill.style.width = Math.max(0, Math.min(100, (repCount / target) * 100)) + "%";
+      } else {
+        let next = 10;
+        if (repCount >= 150) next = 200;
+        else if (repCount >= 100) next = 150;
+        else if (repCount >= 75) next = 100;
+        else if (repCount >= 50) next = 75;
+        else if (repCount >= 30) next = 50;
+        else if (repCount >= 10) next = 30;
+        milestoneText.textContent = `${t("labels.milestone")} : ${next}`;
+        progressFill.style.width = Math.max(0, Math.min(100, (repCount / next) * 100)) + "%";
+      }
+
+      phaseChip.textContent = `${t("labels.phase")} : ${t("labels.ready")}`;
+    }
+
+    function resetChallengeState(resetScore=true){
+      challengeRunning = false;
+      challengeFinished = false;
+      challengeStartTs = null;
+      challengeRoundState = "work";
+      challengeRoundUntil = null;
+      ladderGoal = 1;
+      noPauseFail = false;
+      if(resetScore) repCount = 0;
+      repCountEl.textContent = repCount;
+      timerText.textContent = "00:00";
+      updateUI();
+    }
+
+    function drawPose(pose){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      const pairs = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.MoveNet);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#9d75ff";
+      for(const [i,j] of pairs){
+        const a = pose.keypoints[i], b = pose.keypoints[j];
+        if(a && b && a.score >= 0.35 && b.score >= 0.35){
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+        }
+      }
+      for(const kp of pose.keypoints){
+        if(kp.score >= 0.35){
+          ctx.beginPath(); ctx.arc(kp.x,kp.y,5.2,0,Math.PI*2);
+          ctx.fillStyle = "#6ff0ff";
+          ctx.fill();
+        }
+      }
+    }
+
+    function markRep(){
+      const now = performance.now();
+      if(now - lastRepTs < 500) return;
+
+      repCount++;
+      streak++;
+      addLifetimePushup();
+      lastRepTs = now;
+      lastRepGapTs = now;
+      updateUI();
+
+      if(repCount % 10 === 0){
+        setStatus(`${t("statuses.milestone")} : ${repCount}`);
+        setCoach(t("coach.milestone"));
+      } else {
+        setStatus(`${t("statuses.rep")} • ${repCount}`);
+      }
+
+      if (challengeMode === "daily" && challengeRunning) {
+        const target = Math.max(1, parseInt(dailyTargetInput.value || "1", 10));
+        saveBestScore("daily", repCount);
+        renderBestScores();
+        if (repCount >= target) {
+          challengeRunning = false;
+          challengeFinished = true;
+          const streak = completeDailyStreakIfNeeded();
+          renderBestScores();
+          setStatus(`${t("statuses.challengeDone")} • Streak : 🏋️ ${streak}`);
+        }
+      }
+
+      if (challengeMode === "free") {
+        saveBestScore("free", repCount);
+        renderBestScores();
+      }
+    }
+
+    function processPushupOnly(pose){
+      const lS = getKP(pose,"left_shoulder"), rS = getKP(pose,"right_shoulder");
+      const lE = getKP(pose,"left_elbow"), rE = getKP(pose,"right_elbow");
+      const lW = getKP(pose,"left_wrist"), rW = getKP(pose,"right_wrist");
+
+      const elbow = mean([angle(lS,lE,lW), angle(rS,rE,rW)]);
+      if(elbow == null){
+        setStatus(t("statuses.arms"));
+        setCoach(t("coach.profile"));
+        return;
+      }
+
+      smoothedMetric = ema(smoothedMetric, elbow, 0.25);
+      metricChip.textContent = `${t("labels.angle")} : ${Math.round(smoothedMetric)}°`;
+
+      const cfg = LEVEL_CONFIG[levelSelect.value];
+      const DOWN = cfg.down, UP = cfg.up, READY = cfg.ready;
+
+      if(cooldownFrames > 0) cooldownFrames--;
+
+      if(repState === "ready"){
+        phaseChip.textContent = `${t("labels.phase")} : ${t("labels.ready")}`;
+        if(smoothedMetric > READY){
+          confirmFrames++;
+          if(confirmFrames >= 2){
+            repState = "up";
+            confirmFrames = 0;
+            setCoach(t("coach.descend"));
+          }
+        } else confirmFrames = 0;
+      }
+      else if(repState === "up"){
+        phaseChip.textContent = `${t("labels.phase")} : ↓`;
+        if(smoothedMetric < DOWN){
+          confirmFrames++;
+          if(confirmFrames >= 3){
+            repState = "down";
+            confirmFrames = 0;
+            setStatus(t("statuses.bottom"));
+            setCoach(t("coach.up"));
+          }
+        } else confirmFrames = 0;
+      }
+      else if(repState === "down"){
+        phaseChip.textContent = `${t("labels.phase")} : ↑`;
+        if(smoothedMetric > UP && cooldownFrames === 0){
+          confirmFrames++;
+          if(confirmFrames >= 3){
+            markRep();
+            repState = "up";
+            cooldownFrames = 8;
+            confirmFrames = 0;
+          }
+        } else confirmFrames = 0;
+      }
+    }
+
+    function updateChallengeTimer(){
+      const now = performance.now();
+      if (!challengeRunning) {
+        timerText.textContent = sessionRunning ? formatTime(now - sessionStartTs) : "00:00";
+        return;
+      }
+
+      if (challengeMode === "hiit") {
+        const remaining = Math.max(0, challengeRoundUntil - now);
+        timerText.textContent = formatTime(remaining);
+        if (remaining <= 0) {
+          if (challengeRoundState === "work") {
+            challengeRoundState = "rest";
+            challengeRoundUntil = now + 10000;
+            setStatus("Repos : 10 secondes.");
+          } else {
+            challengeRoundState = "work";
+            challengeRoundUntil = now + 20000;
+            setStatus("Travail : 20 secondes.");
+          }
+        }
+      }
+      else if (challengeMode === "nopause") {
+        timerText.textContent = sessionRunning ? formatTime(now - sessionStartTs) : "00:00";
+        if (lastRepGapTs && (now - lastRepGapTs > 2000) && repCount > 0 && !noPauseFail) {
+          noPauseFail = true;
+          challengeRunning = false;
+          challengeFinished = true;
+          saveBestScore("nopause", repCount);
+          renderBestScores();
+          setStatus(`${t("statuses.challengeDone")} : ${repCount}`);
+        }
+      }
+      else {
+        timerText.textContent = challengeRunning && challengeStartTs ? formatTime(now - challengeStartTs) : "00:00";
+      }
+    }
+
+    function launchChallenge(){
+      challengeMode = challengeSelect.value;
+      resetChallengeState(true);
+
+      if (challengeMode === "free") {
+        challengeRunning = true;
+        challengeStartTs = performance.now();
+        setStatus(t("statuses.free"));
+        setCoach(t("coach.free"));
+      } else if (challengeMode === "daily") {
+        challengeRunning = true;
+        challengeStartTs = performance.now();
+        setStatus(t("statuses.daily"));
+        setCoach(t("coach.daily"));
+      }
+
+      updateUI();
+    }
+
+    async function initModel(){
+      modelBadge.textContent = "Model: loading...";
+      await tf.setBackend("webgl");
+      await tf.ready();
+      detector = await poseDetection.createDetector(
+        poseDetection.SupportedModels.MoveNet,
+        { modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING }
+      );
+      modelBadge.textContent = "Model: MoveNet ready";
+    }
+
+    async function startCamera(){
+      if(stream) stream.getTracks().forEach(t=>t.stop());
+      stream = await navigator.mediaDevices.getUserMedia({
+        video:{ width:{ideal:1280}, height:{ideal:720}, facingMode:facingMode },
+        audio:false
+      });
+      video.srcObject = stream;
+      await new Promise(resolve => {
+        video.onloadedmetadata = async () => { try{ await video.play(); }catch(e){} resolve(); };
+      });
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      cameraBadge.textContent = `${lang === "fr" ? "Caméra" : lang === "en" ? "Camera" : "Cámara"} : ${facingMode==="user" ? (lang === "fr" ? "avant / PC" : lang === "en" ? "front / PC" : "frontal / PC") : (lang === "fr" ? "arrière" : lang === "en" ? "rear" : "trasera")}`;
+    }
+
+    async function loop(){
+      if(!running) return;
+      try{
+        if(video.readyState >= 2 && detector){
+          if(canvas.width !== video.videoWidth || canvas.height !== video.videoHeight){
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+          }
+
+          const poses = await detector.estimatePoses(video, { flipHorizontal:false });
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+
+          if(poses.length > 0){
+            const pose = poses[0];
+            drawPose(pose);
+            processPushupOnly(pose);
+          } else {
+            setStatus(t("statuses.noBody"));
+          }
+
+          frames++;
+          const now = performance.now();
+          if(now-lastFpsTime >= 1000){
+            fpsBadge.textContent = `FPS : ${frames}`;
+            frames = 0;
+            lastFpsTime = now;
+          }
+
+          updateChallengeTimer();
+        }
+      } catch(err){
+        console.error(err);
+        setStatus(t("statuses.errorStart") + err.message);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    function startSession(){
+      if(sessionRunning) return;
+      sessionRunning = true;
+      sessionStartTs = performance.now();
+      sessionBtn.textContent = t("stopSession");
+      sessionInterval = setInterval(() => {
+        sessionLabel.textContent = formatTime(performance.now() - sessionStartTs);
+      }, 250);
+    }
+
+    function stopSession(){
+      sessionRunning = false;
+      clearInterval(sessionInterval);
+      sessionInterval = null;
+      sessionBtn.textContent = t("startSession");
+    }
+
+    languageSelect.addEventListener("change", () => {
+      lang = languageSelect.value;
+      applyLanguage();
+    });
+
+    challengeSelect.addEventListener("change", () => {
+      challengeMode = challengeSelect.value;
+      updateUI();
+      setStatus(t("statuses.challengeHint"));
+    });
+
+    startBtn.addEventListener("click", async () => {
+      startBtn.disabled = true;
+      startBtn.textContent = "...";
+      try{
+        if(!detector) await initModel();
+        await startCamera();
+        if(!running){ running = true; loop(); }
+        setStatus(t("statuses.cameraReady"));
+        setCoach(t("coach.profile"));
+        startBtn.textContent = t("startCamera");
+      } catch(err){
+        console.error(err);
+        setStatus(t("statuses.errorStart") + err.message);
+        startBtn.disabled = false;
+        startBtn.textContent = t("startCamera");
+      }
+    });
+
+    switchBtn.addEventListener("click", async () => {
+      facingMode = facingMode==="user" ? "environment" : "user";
+      if(detector){
+        try{
+          await startCamera();
+          setStatus(t("statuses.cameraChanged"));
+        } catch(err){
+          setStatus(t("statuses.errorStart") + err.message);
+        }
+      }
+    });
+
+    resetBtn.addEventListener("click", () => {
+      repCount = 0;
+      streak = 0;
+      repState = "ready";
+      smoothedMetric = null;
+      confirmFrames = 0;
+      cooldownFrames = 0;
+      resetChallengeState(true);
+      setStatus(t("statuses.reset"));
+      setCoach(t("coach.profile"));
+    });
+
+    sessionBtn.addEventListener("click", () => {
+      if(!sessionRunning) startSession();
+      else stopSession();
+    });
+
+    startChallengeBtn.addEventListener("click", () => {
+      launchChallenge();
+    });
+
+    normalizeDailyStreak();
+    applyLanguage();
+    setStatus(t("statuses.waiting"));
+    setCoach(t("coach.profile"));
+  </script>
+</body>
+</html>
